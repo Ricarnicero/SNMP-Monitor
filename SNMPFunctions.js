@@ -6,22 +6,6 @@ class SNMPFunctions {
     this.db = firebase.firestore();
   }
 
-  createServer(ip, comunidad, oids) {
-    return this.db
-      .collection("Servidores")
-      .add({
-        ip: ip,
-        comunidad: comunidad,
-        OIDS: oids
-      })
-      .then(refdoc => {
-        console.log(`ID del post insertado: ${refdoc.id}`);
-      })
-      .catch(error => {
-        console.log(`Hubo error en: ${error}`);
-      });
-  }
-
   registerActivity(ip, comunidad, oid, value) {
     return this.db
       .collection("Registros")
@@ -29,7 +13,8 @@ class SNMPFunctions {
         ip: `${ip}`,
         comunidad: `${comunidad}`,
         OID: `${oid}`,
-        value: `${value}`
+        value: `${value}`,
+        date: firebase.firestore.Timestamp.fromDate(new Date())
       })
       .then(refdoc => {
         console.log(`ID del post insertado: ${refdoc.id}`);
