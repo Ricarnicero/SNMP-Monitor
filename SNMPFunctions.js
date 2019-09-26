@@ -37,6 +37,18 @@ class SNMPFunctions {
       });
   }
 
+  registerActivityOnce(serverid, oidname, value) {
+    this.db
+      .collection("Servidores")
+      .doc(serverid)
+      .update({
+        [oidname]: `${value}`,
+      })
+      .catch(error => {
+        console.log(`Error: ${error}`);
+      });
+  }
+
   async Monitorear(ip, comunidad, oids, serverid, oidname, unused) {
     var session = snmp.createSession(ip, comunidad);
     var binds = [];
@@ -48,7 +60,7 @@ class SNMPFunctions {
         else
           for (var i = 0; i < varbinds.length; i++)
             if (snmp.isVarbindError(varbinds[i]))
-              console.error("Error " + snmp.varbindError(varbinds[i]));
+            bigError = snmp.varbindError(varbinds[i]);
             else binds.push(varbinds[i]);
 
         resolve("ok");
@@ -77,7 +89,7 @@ class SNMPFunctions {
         else
           for (var i = 0; i < varbinds.length; i++)
             if (snmp.isVarbindError(varbinds[i]))
-              console.error("Error => " + snmp.varbindError(varbinds[i]));
+              bigError = snmp.varbindError(varbinds[i]);
             else binds.push(varbinds[i]);
 
         resolve("ok");
@@ -90,6 +102,32 @@ class SNMPFunctions {
       console.log(`ERROR: ${bigError}`);
     } else {
       this.registerActivitySimple(serverid, oidname, binds[0].value);
+    }
+  }
+
+  async MonitorOnce(ip, comunidad, oids, serverid, oidname) {
+    var session = snmp.createSession(ip, comunidad);
+    var binds = [];
+    var bigError;
+    let promise = new Promise((resolve, reject) => {
+      session.get(oids, function(error, varbinds) {
+        if (error) bigError = error;
+        else
+          for (var i = 0; i < varbinds.length; i++)
+            if (snmp.isVarbindError(varbinds[i]))
+              bigError = snmp.varbindError(varbinds[i]);
+            else binds.push(varbinds[i]);
+
+        resolve("ok");
+        // If done, close the session
+        session.close();
+      });
+    });
+    let result = await promise;
+    if (bigError) {
+      console.log(`ERROR: ${bigError}`);
+    } else {
+      this.registerActivityOnce(serverid, oidname, binds[0].value);
     }
   }
 }

@@ -12,18 +12,71 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const SNMPFunctions = require("./SNMPFunctions");
+const ping = require('ping');
+const notification = require('./Notofication');
+setServerAlive = serverid => {
+  firebase
+      .firestore().collection("Servidores").doc(serverid).update({alive:true});
+};
 
-setInterval(function() {
-  try {
-    firebase
+setServerDead = (serverid,ip,comunidad) => {
+  firebase
+      .firestore().collection("Servidores").doc(serverid).update({alive:false});
+  var notify = new notification();
+  notify.sendNotification("facebook",ip,comunidad,"está muerto")
+};
+
+firebase
       .firestore()
       .collection("Servidores")
-      .onSnapshot(querySnapshot => {
+      .get().then(querySnapshot => {
+        querySnapshot.forEach(servidor => {
+          ping.sys.probe(servidor.data().ip, function(isAlive){
+            if(isAlive)setServerAlive(servidor.id);
+            else setServerDead(servidor.id,servidor.data().ip,servidor.data().comunidad);
+            }
+        );
+        });
+      });
+
+
+      firebase
+      .firestore()
+      .collection("Servidores")
+      .where("alive","==",true)
+      .get().then(querySnapshot => {
         querySnapshot.forEach(servidor => {
           firebase
             .firestore()
             .collection("OIDS")
-            .onSnapshot(snapShot => {
+            .where("once","==",true)
+            .get().then(snapShot => {
+              snapShot.forEach(OIDdoc => {
+                var fn = new SNMPFunctions();
+                  fn.MonitorOnce(
+                    servidor.data().ip,
+                    servidor.data().comunidad,
+                    [OIDdoc.data().oid],
+                    servidor.id,
+                    OIDdoc.data().nombre
+                  );
+              });
+            });
+        });
+      });
+ setInterval(function() {
+  try {
+    firebase
+      .firestore()
+      .collection("Servidores")
+      .where("alive","==",true)
+      .get().then(querySnapshot => {
+        querySnapshot.forEach(servidor => {
+          firebase
+            .firestore()
+            .collection("OIDS")
+            .where("once","==",false)
+            .get().then(snapShot => {
               snapShot.forEach(OIDdoc => {
                 var fn = new SNMPFunctions();
                 if (OIDdoc.data().oidref)
@@ -47,10 +100,6 @@ setInterval(function() {
             });
         });
       });
-
-    //setInterval(function() {
-    //var fn = new SNMPFunctions();
-    //fn.Monitorear("192.168.0.51", "public", ["1.3.6.1.4.1.2021.4.6.0"]);
   } catch (ex) {
     console.log(ex.message);
   }
