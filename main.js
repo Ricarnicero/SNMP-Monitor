@@ -14,22 +14,44 @@ firebase.initializeApp(firebaseConfig);
 const SNMPFunctions = require("./SNMPFunctions");
 
 setInterval(function() {
-  firebase
-    .firestore()
-    .collection("Servidores")
-    .onSnapshot(querySnapshot => {
-      querySnapshot.forEach(servidor => {
-        var fn = new SNMPFunctions();
-        fn.Monitorear(
-          servidor.data().ip,
-          servidor.data().comunidad,
-          servidor.data().OIDS,
-          servidor.id
-        );
+  try {
+    firebase
+      .firestore()
+      .collection("Servidores")
+      .onSnapshot(querySnapshot => {
+        querySnapshot.forEach(servidor => {
+          firebase
+            .firestore()
+            .collection("OIDS")
+            .onSnapshot(snapShot => {
+              snapShot.forEach(OIDdoc => {
+                var fn = new SNMPFunctions();
+                if (OIDdoc.data().oidref)
+                  fn.Monitorear(
+                    servidor.data().ip,
+                    servidor.data().comunidad,
+                    [OIDdoc.data().oid, OIDdoc.data().oidref],
+                    servidor.id,
+                    OIDdoc.data().nombre,
+                    OIDdoc.data().unused
+                  );
+                else
+                  fn.MonitorSimple(
+                    servidor.data().ip,
+                    servidor.data().comunidad,
+                    [OIDdoc.data().oid],
+                    servidor.id,
+                    OIDdoc.data().nombre
+                  );
+              });
+            });
+        });
       });
-    });
-  /*fn.Monitorear("192.168.0.29", "public", [
-    "1.3.6.1.2.1.1.5.0",
-    "1.3.6.1.2.1.1.6.0"
-  ]);*/
-}, 1000);
+
+    //setInterval(function() {
+    //var fn = new SNMPFunctions();
+    //fn.Monitorear("192.168.0.51", "public", ["1.3.6.1.4.1.2021.4.6.0"]);
+  } catch (ex) {
+    console.log(ex.message);
+  }
+}, 2000);
