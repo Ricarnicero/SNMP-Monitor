@@ -1,5 +1,7 @@
 const firebase = require("firebase");
 var snmp = require("net-snmp");
+const notification = require('./Notofication');
+const notify = new notification();
 
 class SNMPFunctions {
   constructor() {
@@ -18,7 +20,7 @@ class SNMPFunctions {
         date: firebase.firestore.Timestamp.fromDate(new Date())
       })
       .catch(error => {
-        console.log(`Hubo error en: ${error}`);
+        throw error
       });
   }
 
@@ -33,7 +35,7 @@ class SNMPFunctions {
         date: firebase.firestore.Timestamp.fromDate(new Date())
       })
       .catch(error => {
-        console.log(`Error: ${error}`);
+        throw error
       });
   }
 
@@ -45,7 +47,7 @@ class SNMPFunctions {
         [oidname]: `${value}`,
       })
       .catch(error => {
-        console.log(`Error: ${error}`);
+        throw error
       });
   }
 
@@ -67,10 +69,15 @@ class SNMPFunctions {
         // If done, close the session
         session.close();
       });
+      session.trap (snmp.TrapType.LinkDown, function (error) {
+        if (error)
+            bigError = error;
+    });
     });
     let result = await promise;
     if (bigError) {
-      console.log(`ERROR: ${bigError}`);
+      notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
+      throw BigError
     } else {
       binds = binds[0].oid == oids[0] ? binds : binds.reverse();
       var value =
@@ -99,7 +106,8 @@ class SNMPFunctions {
     });
     let result = await promise;
     if (bigError) {
-      console.log(`ERROR: ${bigError}`);
+  notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
+      throw BigError
     } else {
       this.registerActivitySimple(serverid, oidname, binds[0].value);
     }
@@ -125,7 +133,8 @@ class SNMPFunctions {
     });
     let result = await promise;
     if (bigError) {
-      console.log(`ERROR: ${bigError}`);
+  notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
+      throw BigError
     } else {
       this.registerActivityOnce(serverid, oidname, binds[0].value);
     }

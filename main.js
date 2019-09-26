@@ -14,6 +14,8 @@ firebase.initializeApp(firebaseConfig);
 const SNMPFunctions = require("./SNMPFunctions");
 const ping = require('ping');
 const notification = require('./Notofication');
+const notify = new notification();
+
 setServerAlive = serverid => {
   firebase
       .firestore().collection("Servidores").doc(serverid).update({alive:true});
@@ -22,7 +24,6 @@ setServerAlive = serverid => {
 setServerDead = (serverid,ip,comunidad) => {
   firebase
       .firestore().collection("Servidores").doc(serverid).update({alive:false});
-  var notify = new notification();
   notify.sendNotification("facebook",ip,comunidad,"está muerto")
 };
 
@@ -64,8 +65,30 @@ firebase
             });
         });
       });
- setInterval(function() {
-  try {
+      var snmp = require('snmpjs');
+var bunyan = require('bunyan');
+var util = require('util');
+
+var options = {
+    addr: '192.168.52.116',
+    port: 162,
+    family: 'udp4',
+};
+
+var log = new bunyan({ name: 'snmpd', level: 'trace'});
+
+var trapd = snmp.createTrapListener({log: log});
+
+trapd.on('trap',function(msg) {
+    //console.log(util.inspect(snmp.message.serializer(msg), false, null));
+    console.log("JSON: " + util.inspect(snmp.message.serializer(msg).pdu));
+  notify.sendNotification("facebook","trap Detectada",util.inspect(snmp.message.serializer(msg), false, null)," ")
+
+});
+
+trapd.bind(options);
+      try {
+ var intr = setInterval(function() {
     firebase
       .firestore()
       .collection("Servidores")
@@ -100,7 +123,8 @@ firebase
             });
         });
       });
+    }, 10000);
   } catch (ex) {
+  notify.sendNotification("facebook","El monitor " ,"ha detectado la excepcion ",ex.message)
     console.log(ex.message);
   }
-}, 2000);
