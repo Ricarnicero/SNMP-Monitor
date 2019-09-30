@@ -1,6 +1,6 @@
 const firebase = require("firebase");
 var snmp = require("net-snmp");
-const notification = require('./Notofication');
+const notification = require("./Notofication");
 const notify = new notification();
 
 class SNMPFunctions {
@@ -8,7 +8,7 @@ class SNMPFunctions {
     this.db = firebase.firestore();
   }
 
-  registerActivity(serverid, oidname, value, refvalue) {
+  registerActivity(serverid, oidname, value, refvalue, alert) {
     this.db
       .collection("Servidores")
       .doc(serverid)
@@ -17,10 +17,11 @@ class SNMPFunctions {
         value: `${value}`,
         refvalue: `${refvalue}`,
         oidName: oidname,
-        date: firebase.firestore.Timestamp.fromDate(new Date())
+        date: firebase.firestore.Timestamp.fromDate(new Date()),
+        alert: alert
       })
       .catch(error => {
-        throw error
+        throw error;
       });
   }
 
@@ -35,7 +36,7 @@ class SNMPFunctions {
         date: firebase.firestore.Timestamp.fromDate(new Date())
       })
       .catch(error => {
-        throw error
+        throw error;
       });
   }
 
@@ -44,10 +45,10 @@ class SNMPFunctions {
       .collection("Servidores")
       .doc(serverid)
       .update({
-        [oidname]: `${value}`,
+        [oidname]: `${value}`
       })
       .catch(error => {
-        throw error
+        throw error;
       });
   }
 
@@ -62,27 +63,37 @@ class SNMPFunctions {
         else
           for (var i = 0; i < varbinds.length; i++)
             if (snmp.isVarbindError(varbinds[i]))
-            bigError = snmp.varbindError(varbinds[i]);
+              bigError = snmp.varbindError(varbinds[i]);
             else binds.push(varbinds[i]);
 
         resolve("ok");
         // If done, close the session
         session.close();
       });
-      session.trap (snmp.TrapType.LinkDown, function (error) {
-        if (error)
-            bigError = error;
-    });
+    }).catch(error => {
+      bigError = error;
     });
     let result = await promise;
     if (bigError) {
-      notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
-      throw BigError
+      notify.sendNotification(
+        "facebook",
+        "El servidor " + ip,
+        " con comunidad " + comunidad + " sufre de ",
+        bigError
+      );
+      throw new Error(bigError);
     } else {
       binds = binds[0].oid == oids[0] ? binds : binds.reverse();
       var value =
         unused == true ? binds[1].value - binds[0].value : binds[0].value;
-      this.registerActivity(serverid, oidname, value, binds[1].value);
+      var alert;
+      try {
+        alert = value / binds[1].value > 0.8 ? true : false;
+      } catch {
+        alert = false;
+      }
+
+      this.registerActivity(serverid, oidname, value, binds[1].value, alert);
     }
   }
 
@@ -103,11 +114,18 @@ class SNMPFunctions {
         // If done, close the session
         session.close();
       });
+    }).catch(error => {
+      bigError = error;
     });
     let result = await promise;
     if (bigError) {
-  notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
-      throw BigError
+      notify.sendNotification(
+        "facebook",
+        "El servidor " + ip,
+        " con comunidad " + comunidad + " sufre de ",
+        bigError
+      );
+      throw new Error(bigError);
     } else {
       this.registerActivitySimple(serverid, oidname, binds[0].value);
     }
@@ -130,11 +148,18 @@ class SNMPFunctions {
         // If done, close the session
         session.close();
       });
+    }).catch(error => {
+      bigError = error;
     });
     let result = await promise;
     if (bigError) {
-  notify.sendNotification("facebook","El servidor " + ip," con comunidad " + comunidad + " sufre de ",bigError);
-      throw BigError
+      notify.sendNotification(
+        "facebook",
+        "El servidor " + ip,
+        " con comunidad " + comunidad + " sufre de ",
+        bigError
+      );
+      throw new Error(bigError);
     } else {
       this.registerActivityOnce(serverid, oidname, binds[0].value);
     }

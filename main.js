@@ -12,94 +12,112 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 
 const SNMPFunctions = require("./SNMPFunctions");
-const ping = require('ping');
-const notification = require('./Notofication');
+const ping = require("ping");
+const notification = require("./Notofication");
 const notify = new notification();
 
 setServerAlive = serverid => {
   firebase
-      .firestore().collection("Servidores").doc(serverid).update({alive:true});
+    .firestore()
+    .collection("Servidores")
+    .doc(serverid)
+    .update({ alive: true });
 };
 
-setServerDead = (serverid,ip,comunidad) => {
+setServerDead = (serverid, ip, comunidad) => {
   firebase
-      .firestore().collection("Servidores").doc(serverid).update({alive:false});
-  notify.sendNotification("facebook",ip,comunidad,"está muerto")
+    .firestore()
+    .collection("Servidores")
+    .doc(serverid)
+    .update({ alive: false });
+  notify.sendNotification("facebook", ip, comunidad, "está muerto");
 };
+
+// firebase
+//   .firestore()
+//   .collection("Servidores")
+//   .get()
+//   .then(querySnapshot => {
+//     querySnapshot.forEach(servidor => {
+//       ping.sys.probe(servidor.data().ip, function(isAlive) {
+//         if (isAlive) setServerAlive(servidor.id);
+//         else
+//           setServerDead(
+//             servidor.id,
+//             servidor.data().ip,
+//             servidor.data().comunidad
+//           );
+//       });
+//     });
+//   });
 
 firebase
-      .firestore()
-      .collection("Servidores")
-      .get().then(querySnapshot => {
-        querySnapshot.forEach(servidor => {
-          ping.sys.probe(servidor.data().ip, function(isAlive){
-            if(isAlive)setServerAlive(servidor.id);
-            else setServerDead(servidor.id,servidor.data().ip,servidor.data().comunidad);
-            }
-        );
-        });
-      });
-
-
+  .firestore()
+  .collection("Servidores")
+  .where("alive", "==", true)
+  .get()
+  .then(querySnapshot => {
+    querySnapshot.forEach(servidor => {
       firebase
-      .firestore()
-      .collection("Servidores")
-      .where("alive","==",true)
-      .get().then(querySnapshot => {
-        querySnapshot.forEach(servidor => {
-          firebase
-            .firestore()
-            .collection("OIDS")
-            .where("once","==",true)
-            .get().then(snapShot => {
-              snapShot.forEach(OIDdoc => {
-                var fn = new SNMPFunctions();
-                  fn.MonitorOnce(
-                    servidor.data().ip,
-                    servidor.data().comunidad,
-                    [OIDdoc.data().oid],
-                    servidor.id,
-                    OIDdoc.data().nombre
-                  );
-              });
-            });
+        .firestore()
+        .collection("OIDS")
+        .where("once", "==", true)
+        .get()
+        .then(snapShot => {
+          snapShot.forEach(OIDdoc => {
+            var fn = new SNMPFunctions();
+            fn.MonitorOnce(
+              servidor.data().ip,
+              servidor.data().comunidad,
+              [OIDdoc.data().oid],
+              servidor.id,
+              OIDdoc.data().nombre
+            ).catch(error => {});
+          });
         });
-      });
-      var snmp = require('snmpjs');
-var bunyan = require('bunyan');
-var util = require('util');
+    });
+  });
+var snmp = require("snmpjs");
+var bunyan = require("bunyan");
+var util = require("util");
 
 var options = {
-    addr: '192.168.52.116',
-    port: 162,
-    family: 'udp4',
+  addr: "192.168.3.141",
+  port: 162,
+  family: "udp4"
 };
 
-var log = new bunyan({ name: 'snmpd', level: 'trace'});
+var log = new bunyan({ name: "snmpd", level: "trace" });
 
-var trapd = snmp.createTrapListener({log: log});
+var trapd = snmp.createTrapListener({ log: log });
 
-trapd.on('trap',function(msg) {
-    //console.log(util.inspect(snmp.message.serializer(msg), false, null));
-    console.log("JSON: " + util.inspect(snmp.message.serializer(msg).pdu));
-  notify.sendNotification("facebook","trap Detectada",util.inspect(snmp.message.serializer(msg), false, null)," ")
-
+trapd.on("trap", function(msg) {
+  //console.log(util.inspect(snmp.message.serializer(msg), false, null));
+  console.log("JSON: " + util.inspect(snmp.message.serializer(msg).pdu));
+  notify.sendNotification(
+    "facebook",
+    "trap Detectada",
+    util.inspect(snmp.message.serializer(msg), false, null),
+    " "
+  );
 });
 
 trapd.bind(options);
-      try {
- var intr = setInterval(function() {
+try {
+  var intr = setInterval(function() {
     firebase
       .firestore()
       .collection("Servidores")
-      .where("alive","==",true)
-      .get().then(querySnapshot => {
+      .where("alive", "==", true)
+      .get()
+      .then(querySnapshot => {
         querySnapshot.forEach(servidor => {
           firebase
             .firestore()
             .collection("OIDS")
-            .where("once","==",false)
-            .get().then(snapShot => {
+            .where("once", "==", false)
+            .get()
+            .then(snapShot => {
               snapShot.forEach(OIDdoc => {
                 var fn = new SNMPFunctions();
                 if (OIDdoc.data().oidref)
@@ -110,7 +128,7 @@ trapd.bind(options);
                     servidor.id,
                     OIDdoc.data().nombre,
                     OIDdoc.data().unused
-                  );
+                  ).catch(error => {});
                 else
                   fn.MonitorSimple(
                     servidor.data().ip,
@@ -118,13 +136,18 @@ trapd.bind(options);
                     [OIDdoc.data().oid],
                     servidor.id,
                     OIDdoc.data().nombre
-                  );
+                  ).catch(error => {});
               });
             });
         });
       });
-    }, 10000);
-  } catch (ex) {
-  notify.sendNotification("facebook","El monitor " ,"ha detectado la excepcion ",ex.message)
-    console.log(ex.message);
-  }
+  }, 10000);
+} catch (ex) {
+  notify.sendNotification(
+    "facebook",
+    "El monitor ",
+    "ha detectado la excepcion ",
+    ex.message
+  );
+  console.log(ex.message);
+}
