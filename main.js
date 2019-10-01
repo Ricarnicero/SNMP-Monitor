@@ -33,23 +33,23 @@ setServerDead = (serverid, ip, comunidad) => {
   notify.sendNotification("facebook", ip, comunidad, "está muerto");
 };
 
-// firebase
-//   .firestore()
-//   .collection("Servidores")
-//   .get()
-//   .then(querySnapshot => {
-//     querySnapshot.forEach(servidor => {
-//       ping.sys.probe(servidor.data().ip, function(isAlive) {
-//         if (isAlive) setServerAlive(servidor.id);
-//         else
-//           setServerDead(
-//             servidor.id,
-//             servidor.data().ip,
-//             servidor.data().comunidad
-//           );
-//       });
-//     });
-//   });
+firebase
+  .firestore()
+  .collection("Servidores")
+  .get()
+  .then(querySnapshot => {
+    querySnapshot.forEach(servidor => {
+      ping.sys.probe(servidor.data().ip, function(isAlive) {
+        if (isAlive) setServerAlive(servidor.id);
+        else
+          setServerDead(
+            servidor.id,
+            servidor.data().ip,
+            servidor.data().comunidad
+          );
+      });
+    });
+  });
 
 firebase
   .firestore()
@@ -82,7 +82,7 @@ var bunyan = require("bunyan");
 var util = require("util");
 
 var options = {
-  addr: "192.168.3.141",
+  addr: "10.100.78.24",
   port: 162,
   family: "udp4"
 };
@@ -92,14 +92,21 @@ var log = new bunyan({ name: "snmpd", level: "trace" });
 var trapd = snmp.createTrapListener({ log: log });
 
 trapd.on("trap", function(msg) {
-  //console.log(util.inspect(snmp.message.serializer(msg), false, null));
-  console.log("JSON: " + util.inspect(snmp.message.serializer(msg).pdu));
-  notify.sendNotification(
-    "facebook",
-    "trap Detectada",
-    util.inspect(snmp.message.serializer(msg), false, null),
-    " "
-  );
+  console.log("1"+msg.pdu);
+  console.log("2"+snmp.message.serializer(msg).pdu);
+
+
+  gson = util.inspect(snmp.message.serializer(msg), false, null);
+  // console.log("v: " + gson);
+  // var gson2 = JSON.stringify(eval("(" + gson + ")"));
+  // console.log("v: " + typeof gson2);
+  // console.log(gson2.community);
+  // console.log(gson2.pdu);
+  snmp.message.serializer(msg).pdu.varbinds.forEach(varbind => {
+  if(varbind.oid == '1.3.6.1.4.1.8072.2.3.2') notify.sendNotification("",varbind.string_value.split("//")[0],". Servidor: " + varbind.string_value.split("//")[1],"")
+  if(varbind.oid == '1.3.6.1.6.3.1.1.4.3.0') notify.sendNotification("","Se levantó un server","","")
+  
+})
 });
 
 trapd.bind(options);
